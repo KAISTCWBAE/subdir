@@ -102,7 +102,6 @@ struct thread
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem; /* List element. */
 
-	/**************** project 1: threads *******************/
 	int64_t wakeup_tick;
 
 	int init_priority;
@@ -115,7 +114,6 @@ struct thread
 	int recent_cpu;
 	struct list_elem all_elem;
 
-	/**************** project 2: userprog *******************/
 	struct intr_frame parent_if;
 	struct list_elem child_elem;
 	struct list child_list;
@@ -134,13 +132,9 @@ struct thread
 
 	struct file *run_file;
 
-	/**************** project 3: virtual memory *******************/
 	uintptr_t user_rsp;
 
 	struct list mmap_list;
-
-	/**************** project 4: file system *******************/
-	struct dir *curr_dir;
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */

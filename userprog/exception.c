@@ -142,18 +142,11 @@ page_fault(struct intr_frame *f)
 	write = (f->error_code & PF_W) != 0;
 	user = (f->error_code & PF_U) != 0;
 
-	// printf("[DEBUG]addr: %p\n", fault_addr);
-	// printf("[DEBUG]present bit: %d\n", not_present);
-	// printf("[DEBUG]write bit: %d\n", write);
-	// printf("[DEBUG]user bit: %d\n", user);
-
 #ifdef VM
 	/* For project 3 and later. */
 	if (vm_try_handle_fault(f, fault_addr, user, write, not_present))
 		return;
 #endif
-
-	// printf("[DEBUG]fault_addr: %p\n", fault_addr);
 
 	/* Count page faults. */
 	page_fault_cnt++;
