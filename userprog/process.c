@@ -20,7 +20,6 @@
 #include "threads/vaddr.h"
 #include "intrinsic.h"
 
-// 편의상
 #define VM
 
 #ifdef VM
@@ -32,11 +31,6 @@ static bool load(const char *file_name, struct intr_frame *if_);
 static void initd(void *f_name);
 static void __do_fork(void *);
 
-/*
-부모 thread가 자신의 child_list에서 입력 받은 pid를 가지고 있는 child thread를 검색
-child_list 전체 순회
-있으면 child의 struct thread, 없으면 NULL return
-*/
 struct thread *get_child_process(int pid)
 {
 	struct list_elem *temp_elem = temp_elem = list_begin(&thread_current()->child_list);
@@ -52,23 +46,9 @@ struct thread *get_child_process(int pid)
 	return NULL;
 }
 
-/*
-struct file *f를 현재 thread의 file descripter table(= fdt)에 저장
-fdt에서의 struct file *f의 index(= fd)를 return
-EXTRA multi-oom을 위해 바꿨지만 문제를 해결한 것 같지 않음
-*/
 int process_add_file(struct file *f)
 {
 	struct thread *curr = thread_current();
-
-	// while (curr->fd_idx < FDT_LIMIT && curr->fdt[curr->fd_idx])
-	// 	curr->fd_idx++;
-
-	// if (curr->fd_idx >= FDT_LIMIT)
-	// 	return -1;
-
-	// curr->fdt[curr->fd_idx] = f;
-	// return curr->fd_idx;
 
 	int fd = 2;
 	while (curr->fdt[fd] != NULL && fd < FDT_LIMIT)
@@ -84,9 +64,6 @@ int process_add_file(struct file *f)
 	return fd;
 }
 
-/*
-입력 받은 fd가 가리키는 struct file pointer를 return
-*/
 struct file *process_get_file(int fd)
 {
 	if (fd < 0 || fd >= FDT_LIMIT)
@@ -119,7 +96,6 @@ tid_t process_create_initd(const char *file_name)
 		return TID_ERROR;
 	strlcpy(fn_copy, file_name, PGSIZE);
 
-	// thread name을 위해 앞부분만 parsing
 	strtok_r(file_name, " ", &save_ptr);
 
 	/* Create a new thread to execute FILE_NAME. */
@@ -148,12 +124,6 @@ initd(void *f_name)
  * TID_ERROR if the thread cannot be created. */
 tid_t process_fork(const char *name, struct intr_frame *if_ UNUSED)
 {
-	/*
-	부모 process가 system call인 fork를 호출해서 user mode에서 kernel mode로 context swtching
-	kernel에서의 작업이 끝난 후에 user mode로 돌아가기 위해 context(= if)를 kernel stack에 저장
-	fork를 통해 만들어진 자식 process는 kernel stack에 저장된 부모 process의 user 상태 if를 복사해서 그대로 사용
-	thread_create로 만들어지는 자식 process에게 if를 전달하기 위해 인자로 받는 부모의 struct thread에 저장해서 전달
-	*/
 	struct thread *parent = thread_current();
 	memcpy(&parent->parent_if, if_, sizeof(struct intr_frame));
 
@@ -161,16 +131,9 @@ tid_t process_fork(const char *name, struct intr_frame *if_ UNUSED)
 	if (pid == TID_ERROR)
 		return TID_ERROR;
 
-	// 자식 process가 load가 완료되기 전까지 부모 process는 대기
 	struct thread *child = get_child_process(pid);
 	sema_down(&child->fork);
 
-	/*
-	자식 process가 제대로 만들어지지 않은 경우
-	process_wait의 semaphore 작업을 통해 자식 process가 exit할 수 있도록 함
-
-	다른 코드는 그냥 TID_ERROR를 return 하는데 둘의 차이점을 좀 더 살펴볼 필요가 있음
-	*/
 	if (child->exit_status < 0)
 		return process_wait(pid);
 
@@ -240,10 +203,7 @@ __do_fork(void *aux)
 	struct thread *current = thread_current();
 	bool succ = true;
 
-	/*
-	1. Read the cpu context to local stack.
-	전달 받아온 부모 process의 user 모드 if를 복사
-	*/
+	/* 1. Read the cpu context to local stack. */
 	struct intr_frame *parent_if = &parent->parent_if;
 	memcpy(&if_, parent_if, sizeof(struct intr_frame));
 
@@ -266,14 +226,10 @@ __do_fork(void *aux)
 	if (parent->fd_idx >= FDT_LIMIT)
 		goto error;
 
-	/*
-	process.h에서 struct MapElem 선언
-	key, value 값을 갖는 struct(dictionary와 유사)
-	*/
-	const int MAPLEN = 10;	// 배열 크기(숫자에 큰 의미는 없음)
-	struct MapElem map[10]; // struct MapElem 배열 선언
-	int dup_idx = 0;		// 배열에서 사용할 index
-	bool found;				// flag
+	const int MAPLEN = 10;
+	struct MapElem map[10];
+	int dup_idx = 0;
+	bool found;	
 
 	for (int i = 0; i < FDT_LIMIT; i++)
 	{
@@ -281,11 +237,6 @@ __do_fork(void *aux)
 		if (f == NULL)
 			continue;
 
-		/*
-		해당 file pointer가 map에 있나 검색(선형 검색)
-		map에 있으면 map의 value를 current의 fdt에 가져온다
-		map에 없으면 새롭게 duplicate한 후에 map에 추가
-		*/
 		found = false;
 		for (int j = 0; j < MAPLEN; j++)
 		{
@@ -302,7 +253,7 @@ __do_fork(void *aux)
 			struct file *new_f;
 			if (f > 2)
 				new_f = file_duplicate(f);
-			else // STD_IN or STD_OUT인 경우
+			else 
 				new_f = f;
 
 			current->fdt[i] = new_f;
@@ -317,10 +268,8 @@ __do_fork(void *aux)
 
 	current->fd_idx = parent->fd_idx;
 
-	// 만들어진 자식 process는 fork()에 대한 return 값을 0으로 받고 시작한다
 	if_.R.rax = 0;
 
-	// fork에서 load가 다끝났으므로 부모 process를 다시 wakeup
 	sema_up(&current->fork);
 
 	/* Finally, switch to the newly created process. */
@@ -328,43 +277,37 @@ __do_fork(void *aux)
 		do_iret(&if_);
 
 error:
-	// 자식 process를 load하는 과정에서 error가 나면 부모 process를 일단 깨우고 load 실패한 자식 process를 TID_ERROR로 종료
+
 	sema_up(&current->fork);
 	exit(-1);
 }
 
 void argument_stack(int argc, char **argv, struct intr_frame *_if)
 {
-	// argument를 역순으로 stack에 push
 	for (int i = argc - 1; i > -1; i--)
 	{
-		size_t len = strlen(argv[i]) + 1; // '\0'을 포함해야하므로 +1
+		size_t len = strlen(argv[i]) + 1; 
 		_if->rsp -= len;
 		memcpy(_if->rsp, argv[i], len);
-		argv[i] = (char *)_if->rsp; // 나중에 argument 주소 삽입을 위해 저장
+		argv[i] = (char *)_if->rsp; 
 	}
 
-	// data align
 	int align = _if->rsp % 8;
 	_if->rsp -= align;
 	memset(_if->rsp, 0, align);
 
-	// argv[argc] = NULL
 	_if->rsp -= 8;
 	memset(_if->rsp, 0, 8);
 
-	// argument의 stack 주소를 역순으로 push
 	for (int i = argc - 1; i > -1; i--)
 	{
 		_if->rsp -= 8;
 		memcpy(_if->rsp, &argv[i], 8);
 	}
 
-	// fake return 주소 push
 	_if->rsp -= 8;
 	memset(_if->rsp, 0, 8);
 
-	// rdi(첫번째 인자 register)와 rsi(두번째 인자 register)에 argc와 argv 삽입
 	_if->R.rdi = argc;
 	_if->R.rsi = _if->rsp + 8;
 
@@ -393,9 +336,6 @@ int process_exec(void *f_name)
 
 	/* And then load the binary */
 	success = load(file_name, &_if);
-
-	// stack에 인자 전달 확인
-	// hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, 1);
 
 	/* If load failed, quit. */
 	palloc_free_page(file_name);
@@ -428,17 +368,11 @@ int process_wait(tid_t child_tid UNUSED)
 	if (child == NULL)
 		return -1;
 
-	// 자식 process가 exit될 때까지 sleep
 	sema_down(&child->wait);
 
-	/*
-	자식 process가 process_exit 실행 중에 wait하는 부모 process를 wakeup
-	종료하는 자식 process의 exit status를 읽어오고 child_list에서 삭제
-	*/
 	int status = child->exit_status;
 	list_remove(&child->child_elem);
 
-	// 위의 작업이 끝나기를 기다리는 자식 process를 wakeup
 	sema_up(&child->exit);
 
 	return status;
@@ -453,28 +387,18 @@ void process_exit(void)
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
 
-	/*
-	실행 중인 file을 닫음
-	deny write on executables를 위해 실행 중인 파일을 계속 open해 놓는다
-	process 종료하기 전에 닫음
-	*/
 	file_close(curr->run_file);
-
-	// fdt에 있는 모든 file descripter를 모두 닫는다
 	for (int i = 0; i < FDT_LIMIT; i++)
 		close(i);
 
-	// palloc으로 memory를 할당 받는 fdt를 free한다
 	palloc_free_page(curr->fdt);
 
 	dir_close(curr->curr_dir);
 
 	process_cleanup();
 
-	// wait을 하고 있는 부모 process를 wakeup
 	sema_up(&thread_current()->wait);
 
-	// 부모 process가 삭제 작업을 마치기 전까지 sleep
 	sema_down(&thread_current()->exit);
 }
 
@@ -619,10 +543,8 @@ load(const char *file_name, struct intr_frame *if_)
 		goto done;
 	}
 
-	// process를 종료할 때 닫기 위해 file descripter를 따로 저장해 둔다
 	thread_current()->run_file = file;
 
-	// 실행하려고 open한 file을 write하지 못하게 한다
 	file_deny_write(file);
 
 	/* Read and verify executable header. */
@@ -670,14 +592,6 @@ load(const char *file_name, struct intr_frame *if_)
 				uint64_t page_offset = phdr.p_vaddr & PGMASK;
 				uint32_t read_bytes, zero_bytes;
 
-				// printf("[%d]phdr.p_flags: %d\n", i, phdr.p_flags);
-				// printf("[%d]phdr.p_filesz: %x\n", i, phdr.p_filesz);
-				// printf("[%d]phdr.p_memsz: %x\n", i, phdr.p_memsz);
-				// printf("[%d]file_page: %p\n", i, file_page);
-				// printf("[%d]mem_page: %p\n", i, mem_page);
-				// printf("[%d]page_offset: %p\n", i, page_offset);
-				// printf("\n");
-
 				if (phdr.p_filesz > 0)
 				{
 					/* Normal segment.
@@ -692,9 +606,6 @@ load(const char *file_name, struct intr_frame *if_)
 					read_bytes = 0;
 					zero_bytes = ROUND_UP(page_offset + phdr.p_memsz, PGSIZE);
 				}
-
-				// printf("[%d]read_bytes: %x\n", i, read_bytes);
-				// printf("[%d]zero_bytes: %x\n\n", i, zero_bytes);
 
 				if (!load_segment(file, file_page, (void *)mem_page,
 								  read_bytes, zero_bytes, writable))
@@ -713,18 +624,12 @@ load(const char *file_name, struct intr_frame *if_)
 	/* Start address. */
 	if_->rip = ehdr.e_entry;
 
-	/*
-	user stack에 argument를 쌓는다
-	%rdi와 %rsi에 argc, argv를 각각 삽입
-	*/
-
 	argument_stack(argc, argv, if_);
 
 	success = true;
 
 done:
 	/* We arrive here whether the load is successful or not. */
-	// file_close(file);
 	return success;
 }
 
@@ -889,7 +794,6 @@ lazy_load_segment(struct page *page, void *aux)
 	/* TODO: This called when the first page fault occurs on address VA. */
 	/* TODO: VA is available when calling this function. */
 
-	// aux로 전달 받은 file data
 	struct file_info *file_info = (struct file_info *)aux;
 
 	struct file *file = file_info->file;
@@ -897,18 +801,15 @@ lazy_load_segment(struct page *page, void *aux)
 	int page_read_bytes = file_info->page_read_bytes;
 	int page_zero_bytes = file_info->page_zero_bytes;
 
-	// load해야할 부분으로 file ofs 변경
 	file_seek(file, ofs);
 
 	int temp;
-	// laod segment
 	if ((temp = file_read(file, page->frame->kva, page_read_bytes)) != page_read_bytes)
 	{
 		free(file_info);
 		return false;
 	}
 
-	// setup zero bytes space
 	memset(page->frame->kva + page_read_bytes, 0, page_zero_bytes);
 
 	return true;
@@ -936,7 +837,6 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
 	ASSERT(pg_ofs(upage) == 0);
 	ASSERT(ofs % PGSIZE == 0);
 
-	// read_bytes와 zero_bytes가 모두 0일 때 = 현재 laod segment에 모두 page 할당을 했을 때
 	while (read_bytes > 0 || zero_bytes > 0)
 	{
 		/* Do calculate how to fill this page.
@@ -947,7 +847,6 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
 
 		/*
 		TODO: Set up aux to pass information to the lazy_load_segment.
-		aux를 통해 file data 전달을 위해 만든 struct file_info
 		*/
 		struct file_info *file_info = (struct file_info *)malloc(sizeof(struct file_info));
 
@@ -956,21 +855,14 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
 		file_info->page_read_bytes = page_read_bytes;
 		file_info->page_zero_bytes = page_zero_bytes;
 
-		/*
-		해당 virtual memory(=upage)에 struct page를 할당해줌
-		load 되기 전에는 uninit page
-
-		page fault로 pysical memory로 load될 때 할당될 때 입력 받은 page type으로 변환하고
-		lazy_load_segment 함수를 실행시켜서 upload함
-		*/
 		if (!vm_alloc_page_with_initializer(VM_ANON, upage, writable, lazy_load_segment, file_info))
 			return false;
 
 		/* Advance. */
-		read_bytes -= page_read_bytes; // 남은 read_bytes 갱신
-		zero_bytes -= page_zero_bytes; // 남은 zero_bytes 갱신
-		upage += PGSIZE;			   // virtual address를 옮겨서 다음 page space를 가리키게 함
-		ofs += PGSIZE;				   // 다음 page에 mapping시킬 file 위치 갱신
+		read_bytes -= page_read_bytes; 
+		zero_bytes -= page_zero_bytes; 
+		upage += PGSIZE;			 
+		ofs += PGSIZE;			
 	}
 	return true;
 }
@@ -981,11 +873,6 @@ setup_stack(struct intr_frame *if_)
 {
 	struct thread *curr = thread_current();
 
-	/*
-	stack은 위에서 아래로 커진다
-	stack의 시작 위치는 USER_STACK
-	PGSIZE만큼 빼서 page space 확보 -> 해당 page 시작 virtual address = stack_botton
-	*/
 	void *stack_bottom = (void *)(((uint8_t *)USER_STACK) - PGSIZE);
 
 	/* TODO: Map the stack on stack_bottom and claim the page immediately.
@@ -993,15 +880,12 @@ setup_stack(struct intr_frame *if_)
 	 * TODO: You should mark the page is stack. */
 	/* TODO: Your code goes here */
 
-	// 확보한 page space에 struct page 할당
 	if (!vm_alloc_page_with_initializer(VM_ANON, stack_bottom, true, NULL, NULL))
 		return false;
 
-	// page를 pysical memory에 바로 올림 -> 바로 argument들을 stack에 쌓아야하기 때문에 lazy load할 필요 없음
 	if (!vm_claim_page(stack_bottom))
 		return false;
 
-	// stack pointer 설정
 	if_->rsp = USER_STACK;
 
 	return true;

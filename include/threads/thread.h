@@ -136,6 +136,8 @@ struct thread
 
 	struct list mmap_list;
 
+	struct dir *curr_dir;
+
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4; /* Page map level 4 */
