@@ -15,6 +15,7 @@ struct fat_boot
 	unsigned int fat_start;			  // fat이 시작하는 sector number
 	unsigned int fat_sectors;		  // fat이 차지하는 sector 수
 	unsigned int root_dir_cluster;	  // root directory의 cluster number
+
 };
 
 /* FAT FS */
@@ -173,29 +174,24 @@ void fat_fs_init(void)
  * If CLST is 0, start a new chain.
  * Returns 0 if fails to allocate a new cluster. */
 cluster_t
-fat_create_chain(cluster_t clst)
-{
-	/* FAT에서 empty cluster 탐색 */
+fat_create_chain (cluster_t clst) {
+	/* TODO: Your code goes here. */
 	int i;
-	for (i = 2; i < fat_fs->fat_length && fat_get(i) > 0; i++)
-		;
+	for(i=2; i < fat_fs->fat_length && fat_get(i) > 0; i++);
 
-	/* empty cluster가 없으면 */
-	if (i >= fat_fs->fat_length)
+	if(i >= fat_fs->fat_length){
 		return 0;
+	}
 
-	/* empty cluster에 새로운 cluster 생성 */
 	fat_put(i, EOChain);
 
-	/* 새로운 cluster chain일 때 */
-	if (clst == 0)
+	if(clst == 0){
 		return i;
+	}
 
-	/* 기존 cluster chain의 마지막에 추가할 때 */
-	cluster_t temp_c;
-	for (temp_c = clst; fat_get(temp_c) != EOChain; temp_c = fat_get(temp_c))
-		;
-	fat_put(temp_c, i);
+	cluster_t c;
+	for(c = clst; fat_get(c) != EOChain; c = fat_get(c));
+	fat_put(c, i);
 
 	return i;
 }
@@ -204,17 +200,16 @@ fat_create_chain(cluster_t clst)
  * If PCLST is 0, assume CLST as the start of the chain. */
 void fat_remove_chain(cluster_t clst, cluster_t pclst)
 {
-	/* pcluster가 입력됬으면 pcluster를 chain으로 끝으로 만듬 */
-	if (pclst)
+	if (pclst){
 		fat_put(pclst, EOChain);
+	}
 
-	/* clst부터 순회하면서 FAT에서 할당 해제 */
 	cluster_t temp_c = clst;
 	cluster_t next_c;
-	for (; fat_get(temp_c) != EOChain; temp_c = next_c)
-	{
+	while(fat_get(temp_c) != EOChain){
 		next_c = fat_get(temp_c);
 		fat_put(temp_c, 0);
+		temp_c = next_c;
 	}
 
 	fat_put(temp_c, 0);

@@ -49,13 +49,13 @@ void filesys_init(bool format)
 
 /* Shuts down the file system module, writing any unwritten data
  * to disk. */
-void filesys_done(void)
-{
+void
+filesys_done (void) {
 	/* Original FS */
 #ifdef EFILESYS
-	fat_close();
+	fat_close ();
 #else
-	free_map_close();
+	free_map_close ();
 #endif
 }
 
@@ -63,25 +63,22 @@ void filesys_done(void)
  * Returns true if successful, false otherwise.
  * Fails if a file named NAME already exists,
  * or if internal memory allocation fails. */
-bool filesys_create(const char *name, off_t initial_size)
-{
+bool filesys_create(const char *name, off_t initial_size) {
 	struct thread *curr = thread_current();
 
 	char *copy_name = (char *)malloc(strlen(name) + 1);
 	strlcpy(copy_name, name, strlen(name) + 1);
 
-	/* Root Directory open */
 	char file_name[NAME_MAX + 1];
 	struct dir *dir = parse_path(copy_name, file_name);
 
-	/* struct disk_inode를 저장할 새로운 cluster 할당 */
 	cluster_t inode_cluster = fat_create_chain(0);
 	disk_sector_t inode_sector = cluster_to_sector(inode_cluster);
 
-	/* 할당 받은 cluster에 inode를 만들고 directory에 file 추가 */
 	bool success = (dir != NULL && inode_create(inode_sector, initial_size, INODE_FILE) && dir_add(dir, file_name, inode_sector));
-	if (!success && inode_cluster != 0)
+	if (!success && inode_cluster != 0) {
 		fat_remove_chain(inode_cluster, 0);
+	}
 
 	dir_close(dir);
 	free(copy_name);
@@ -94,9 +91,7 @@ bool filesys_create(const char *name, off_t initial_size)
  * otherwise.
  * Fails if no file named NAME exists,
  * or if an internal memory allocation fails. */
-struct file *
-filesys_open(const char *name)
-{
+struct file *filesys_open(const char *name) {
 	struct thread *curr = thread_current();
 	struct inode *inode = NULL;
 
@@ -108,19 +103,19 @@ filesys_open(const char *name)
 
 	struct dir *dir = parse_path(copy_name, file_name);
 
-	if (dir != NULL)
+	if(dir != NULL) {
 		dir_lookup(dir, file_name, &inode);
-
-	while (inode != NULL && inode_is_link(inode))
-	{
+	}
+	while(inode != NULL && inode_is_link(inode)) {
 		link_path = inode_get_link_name(inode);
 		strlcpy(copy_name, link_path, strlen(link_path) + 1);
 
 		dir_close(dir);
 		dir = parse_path(copy_name, file_name);
 
-		if (dir != NULL)
+		if (dir != NULL) {
 			dir_lookup(dir, file_name, &inode);
+		}
 	}
 
 	dir_close(dir);
@@ -178,7 +173,6 @@ do_format(void)
 	/* Create FAT and save it to the disk. */
 	fat_create();
 
-	/* Root Directory 생성 */
 	disk_sector_t root = cluster_to_sector(ROOT_DIR_CLUSTER);
 	if (!dir_create(root, 16))
 		PANIC("root directory creation failed");
@@ -193,7 +187,6 @@ do_format(void)
 	free_map_create();
 	if (!dir_create(ROOT_DIR_SECTOR, 16))
 		PANIC("root directory creation failed");
-
 	free_map_close();
 #endif
 
@@ -202,8 +195,6 @@ do_format(void)
 
 struct dir *parse_path(char *path_name, char *file_name)
 {
-	// printf("[DEBUG][parse_path]path_name: %s\n", path_name);
-
 	struct thread *curr = thread_current();
 	struct dir *dir;
 
@@ -324,14 +315,12 @@ int filesys_create_link(const char *target, const char *linkpath)
 	if (dir == NULL)
 		return -1;
 
-	/* struct disk_inode를 저장할 새로운 cluster 할당 */
 	cluster_t inode_cluster = fat_create_chain(0);
 	disk_sector_t inode_sector = cluster_to_sector(inode_cluster);
 
 	bool succ_create = inode_create_link(inode_sector, target);
 	bool succ_dir_add = dir_add(dir, file_name, inode_sector);
 
-	/* 할당 받은 cluster에 inode를 만들고 directory에 file 추가 */
 	bool success = (succ_create && succ_dir_add);
 	if (!success && inode_cluster != 0)
 		fat_remove_chain(inode_cluster, 0);

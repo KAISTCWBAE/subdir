@@ -53,8 +53,6 @@ byte_to_sector(const struct inode *inode, off_t pos)
 
 	cluster_t target = sector_to_cluster(inode->data.start);
 
-	/* file length와 관계없이 pos에 크기에 따라 계속 진행
-	   file length보다 pos가 크면 새로운 cluster를 할당해가면서 진행 */
 	while (pos >= DISK_SECTOR_SIZE)
 	{
 		if (fat_get(target) == EOChain)
@@ -246,9 +244,6 @@ void inode_close(struct inode *inode)
 			fat_remove_chain(clst, 0);
 		}
 
-		// /* file을 닫을 때 disk_inode의 변경사항을 disk에 write */
-		// disk_write(filesys_disk, inode->sector, &inode->data);
-
 		free(inode);
 	}
 }
@@ -307,8 +302,6 @@ off_t inode_read_at(struct inode *inode, void *buffer_, off_t size, off_t offset
 				if (bounce == NULL)
 					break;
 			}
-
-			// printf("[DEBUG][inode_read_at]sector_idx: %d\n", sector_idx);
 			disk_read(filesys_disk, sector_idx, bounce);
 			memcpy(buffer + bytes_read, bounce + sector_ofs, chunk_size);
 		}
@@ -346,7 +339,6 @@ off_t inode_write_at(struct inode *inode, const void *buffer_, off_t size, off_t
 		int sector_ofs = offset % DISK_SECTOR_SIZE;
 
 		/* Bytes left in inode, bytes left in sector, lesser of the two. */
-		/* file growth에 의해 length가 길어질 수 있기 때문에 length에 의한 제한을 없앰 */
 		int sector_left = DISK_SECTOR_SIZE - sector_ofs;
 		int min_left = sector_left;
 
@@ -389,7 +381,6 @@ off_t inode_write_at(struct inode *inode, const void *buffer_, off_t size, off_t
 
 	free(bounce);
 
-	/* file growth 됬을 때 inode의 length 갱신 */
 	if (inode_length(inode) < origin_offset + bytes_written)
 	{
 		inode->data.length = origin_offset + bytes_written;
